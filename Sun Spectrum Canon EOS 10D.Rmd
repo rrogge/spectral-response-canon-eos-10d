@@ -133,6 +133,8 @@ smooth <- function(x, y, band, spar) {
 }
 
 I <- subset(S, band=="I")
+I$response <- I$response / max(I$response)
+
 df <- smooth(I$w, I$response, I$band, 0.5)
 
 ggplot() +
@@ -146,6 +148,11 @@ ggplot() +
 R <- subset(S, band=="R")
 G <- subset(S, band=="G")
 B <- subset(S, band=="B")
+
+f <- max(R$response, G$response, B$response)
+R$response <- R$response / f
+G$response <- G$response / f
+B$response <- B$response / f
 
 df <- smooth(R$w, R$response, R$band, 0.5)
 df <- rbind(df, smooth(G$w, G$response, G$band, 0.5))
