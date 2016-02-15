@@ -1,0 +1,167 @@
+---
+title: "Spectral Response Canon EOS 10D"
+author: "Ralph Rogge (RRO)"
+date: "15. Februar 2016"
+output: 
+    html_document:
+        fig_width: 10
+        fig_height: 6
+---
+
+```{r, message=FALSE}
+library(FITSio)
+library(data.table)
+library(ggplot2)
+```
+
+![Sun Spectrum Canon EOS 10D](Sun Spectrum Canon EOS 10D.png)
+
+Load measured Sun's spectra data from file
+```{r}
+i <- readFITS("Sun Spectrum Canon EOS 10D I.fit")
+r <- readFITS("Sun Spectrum Canon EOS 10D R.fit")
+g <- readFITS("Sun Spectrum Canon EOS 10D G.fit")
+b <- readFITS("Sun Spectrum Canon EOS 10D B.fit")
+```
+
+Calculate spectra profile as row means 
+```{r}
+profile <- function(fits, band, scale) {
+    y <- rowMeans(fits$imDat)
+    data.frame(x    = seq(1:fits$axDat$len[1]), # X position in the spectrum
+               raw  = y,                        # Raw intensity
+               band = band                      # Colour band
+    ) 
+}
+
+I <- profile(i, "I")
+R <- profile(r, "R")
+G <- profile(g, "G")
+B <- profile(b, "B")
+```
+
+Adjust green values as we have two of them in the Bayer matrix
+```{r}
+G$raw <- 2 * G$raw
+```
+
+Scale I, R, G, and B relative intensity
+```{r}
+I$y <- I$raw / max(I$raw)
+f <- max(R$raw, G$raw, B$raw)
+R$y <- R$raw / f
+G$y <- G$raw / f
+B$y <- B$raw / f
+```
+
+Combine all spectra into one data structure
+```{r}
+S <- data.frame(x=I$x, y=I$y, raw=I$raw, band=I$band)
+for (DF in list(R,G,B)) {
+    S <- rbind(S, data.frame(x=DF$x, y=DF$y, raw=DF$raw, band=DF$band))
+}
+```
+
+For wavelength calibration I have identified some Fraunhofer lines in the spectra 
+```{r}
+calibration.data <- data.frame(
+    x    = c(404,640,1072,1354),         # X position in the spectrum
+    name = c("G","H β", "D1+D2", "H α"), # Name of Fraunhofer line
+    w    = c(430.7,486.1,589.3,653.3)    # wavelength [nm]
+)
+print(data.table(calibration.data))
+```
+
+Calibrate wavelength with a polynomial model and combine spectra.
+```{r}
+model <- lm(w ~ poly(x,3), calibration.data)
+S$w <- predict(model, newdata=data.frame(x=S$x))
+```
+
+The result is are a set of wavelength calibrated spectra, one for the combined color channels
+```{r}
+w.min <- min(S$w)
+w.max <- max(S$w)
+
+p <- ggplot() +
+    geom_line(data=subset(S,band=="I"), aes(x=w,y=y)) +
+    geom_vline(xintercept=calibration.data$w) +
+    geom_text(data=calibration.data,aes(x=w+10,y=0.9,label=name), hjust=0) +
+    theme_bw() +
+    labs(x="Wavelength [nm]", y="Intensity", title="Sun Spectrum / Canon EOS 10D") +
+    coord_cartesian(xlim=c(w.min,w.max))
+p
+```
+
+and one per color channel, namely R, G, and B.
+```{r}
+p <- ggplot() +
+    geom_line(data=subset(S, band!="I"), aes(x=w,y=y,color=band)) +
+    scale_colour_manual(name="Band", values=c("red", "green", "blue"), labels=c("R", "G", "B")) +
+    theme_bw() +
+    labs(x="Wavelength [nm]", y="Spectral Response", title="Sun Spectrum / Canon EOS 10D (R, G, B)") +
+    coord_cartesian(xlim=c(w.min,w.max))
+p
+```
+
+Load Sun's reference spectrum (AM0) from file
+```{r}
+sun.reference <- read.csv("Wehrli85.csv", sep="", strip.white = T)
+p <- ggplot() +
+    geom_line(data=sun.reference, aes(x=w,y=irr)) +
+    theme_bw() +
+    labs(x="Wavelength [nm]", y="Irradiance [W/m^2/nm]", title="Sun Refernce Spectrum (Wehrli 1985)") +
+    coord_cartesian(xlim=c(w.min,w.max))
+p
+```
+
+Load atmosphere transmission from file
+```{r}
+atmosphere <- read.csv("Atmosphere Transmission.csv", sep="")
+p <- ggplot() +
+    geom_line(data=atmosphere, aes(x=w,y=100*T)) +
+    theme_bw() +
+    labs(x="Wavelength [nm]", y="Transmission [%]", title="Atmosphere Transmission (airmass=2.13)") +
+    coord_cartesian(xlim=c(w.min,w.max))
+p
+```
+
+Calculate spectral response of Canon EOS 10D
+```{r}
+S$irr <- approx(sun.reference$w, sun.reference$irr, S$w)$y
+S$T <- approx(atmosphere$w, atmosphere$T, S$w)$y
+S$response <- S$y / (S$irr * S$T)
+```
+
+```{r}
+smooth <- function(x,y,band,spar) {
+    data.frame(x=x, y=smooth.spline(x, y, spar=spar)$y, band=band)
+}
+
+I.subset <- subset(S, band=="I")
+df <- smooth(I.subset$w, I.subset$response, I.subset$band, 0.5)
+p <- ggplot() +
+    geom_line(data=df, aes(x=x,y=y)) +
+    theme_bw() +
+    labs(x="Wavelength [nm]", y="Spectral Response", title="Spectral Response Canon EOS 10D") +
+    coord_cartesian(xlim=c(w.min,w.max))
+p
+```
+
+```{r}
+R.subset <- subset <- subset(S, band=="R")
+G.subset <- subset <- subset(S, band=="G")
+B.subset <- subset <- subset(S, band=="B")
+
+df <- smooth(R.subset$w, R.subset$response, R.subset$band, 0.5)
+df <- rbind(df, smooth(G.subset$w, G.subset$response, G.subset$band, 0.5))
+df <- rbind(df, smooth(B.subset$w, B.subset$response, B.subset$band, 0.5))
+
+p <- ggplot() +
+    geom_line(data=df, aes(x=x,y=y,color=band)) +
+    scale_colour_manual(name="Band", values=c("red", "green", "blue"), labels=c("R", "G", "B")) +
+    theme_bw() +
+    labs(x="Wavelength [nm]", y="Spectral Response", title="Spectral Reponse Canon EOS 10D") +
+    coord_cartesian(xlim=c(w.min,w.max))
+p
+```
