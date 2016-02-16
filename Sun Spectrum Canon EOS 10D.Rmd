@@ -85,7 +85,7 @@ w.max <- min(max(S$w), 750)
 ggplot() +
     geom_line(data=subset(S,band=="I"), aes(x=w,y=y)) +
     geom_vline(xintercept=calibration.data$w) +
-    geom_text(data=calibration.data, aes(x=w+10,y=0.9,label=name), hjust=0) +
+    geom_text(data=calibration.data, aes(x=w+5,y=0.9,label=name), hjust=0) +
     theme_bw() +
     labs(x="Wavelength [nm]", y="Intensity", title="Sun Spectrum / Canon EOS 10D (I)") +
     coord_cartesian(xlim=c(w.min,w.max))
@@ -94,6 +94,8 @@ ggplot() +
 ```{r}
 ggplot() +
     geom_line(data=subset(S, band!="I"), aes(x=w,y=y,color=band)) +
+    geom_vline(xintercept=calibration.data$w) +
+    geom_text(data=calibration.data, aes(x=w+5,y=0.9,label=name), hjust=0) +
     scale_colour_manual(name="Band", values=c("red", "green", "blue"), labels=c("R", "G", "B")) +
     theme_bw() +
     labs(x="Wavelength [nm]", y="Spectral Response", title="Sun Spectrum / Canon EOS 10D (RGB)") +
@@ -116,7 +118,7 @@ atmosphere <- read.csv("Atmosphere Transmission.csv", sep="")
 ggplot() +
     geom_line(data=atmosphere, aes(x=w,y=100*transmission)) +
     theme_bw() +
-    labs(x="Wavelength [nm]", y="Transmission [%]", title="Atmosphere Transmission (airmass=2.13)") +
+    labs(x="Wavelength [nm]", y="Transmission [%]", title="Atmosphere Transmission (Airmass=2.13)") +
     coord_cartesian(xlim=c(w.min,w.max))
 ```
 
