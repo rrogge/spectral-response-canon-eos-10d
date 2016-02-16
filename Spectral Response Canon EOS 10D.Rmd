@@ -14,14 +14,14 @@ library(data.table)
 library(ggplot2)
 ```
 
-![Sun Spectrum Canon EOS 10D](Sun Spectrum Canon EOS 10D.png)
+![Solar Spectrum Canon EOS 10D](Solar Spectrum Canon EOS 10D.png)
 
-Load measured Sun's spectra data from 2D image files
+Load measured solar spectra from files
 ```{r}
-i <- readFITS("Sun Spectrum Canon EOS 10D I.fit")
-r <- readFITS("Sun Spectrum Canon EOS 10D R.fit")
-g <- readFITS("Sun Spectrum Canon EOS 10D G.fit")
-b <- readFITS("Sun Spectrum Canon EOS 10D B.fit")
+i <- readFITS("Solar Spectrum Canon EOS 10D I.fit")
+r <- readFITS("Solar Spectrum Canon EOS 10D R.fit")
+g <- readFITS("Solar Spectrum Canon EOS 10D G.fit")
+b <- readFITS("Solar Spectrum Canon EOS 10D B.fit")
 ```
 
 Calculate spectra intensity 
@@ -41,7 +41,7 @@ G <- profile(g, "G")
 B <- profile(b, "B")
 ```
 
-Adjust green values as we have two of them per the Bayer matrix element
+Adjust green values as we have two green units per the Bayer matrix element
 ```{r}
 G$raw <- 2 * G$raw
 ```
@@ -65,14 +65,14 @@ for (df in list(R,G,B)) {
 For wavelength calibration I have identified some lines in the spectra 
 ```{r}
 calibration.data <- data.frame(
-    x    = c(404,640,1072,1354),         # X position in the spectrum
-    name = c("G","H β", "D1+D2", "H α"), # Name of (Fraunhofer) line
-    w    = c(430.7,486.1,589.3,653.3)    # wavelength [nm]
+    x       = c(404,640,1072,1354),         # X position in the spectrum
+    name    = c("G","H β", "D1+D2", "H α"), # Name of (Fraunhofer) line
+    w       = c(430.7,486.1,589.3,653.3)    # wavelength [nm]
 )
 print(data.table(calibration.data))
 ```
 
-Use a polynomial model to calibrate wavelength 
+Use a polynomial model to calibrate wavelength and calculate limits for plots
 ```{r}
 model <- lm(w ~ poly(x,3), calibration.data)
 S$w <- predict(model, newdata=data.frame(x=S$x))
@@ -84,37 +84,33 @@ w.max <- min(max(S$w), 750)
 ```{r}
 ggplot() +
     geom_line(data=subset(S,band=="I"), aes(x=w,y=y)) +
-    geom_vline(xintercept=calibration.data$w) +
-    geom_text(data=calibration.data, aes(x=w+5,y=0.9,label=name), hjust=0) +
+    geom_vline(data=calibration.data, aes(xintercept=w, color=c("1", "2", "3", "4"))) +
+    scale_colour_manual(guide=FALSE, values=c("darkblue", "blue", "orange", "red")) +
+    geom_text(data=calibration.data, aes(x=w+5,y=0.95,label=name), hjust=0) +
     theme_bw() +
-    labs(x="Wavelength [nm]", y="Intensity", title="Sun Spectrum / Canon EOS 10D (I)") +
+    labs(x="Wavelength [nm]", y="Intensity", title="Solar Spectrum / Canon EOS 10D (I)") +
     coord_cartesian(xlim=c(w.min,w.max))
+```
+
+Load solar reference spectrum (AM0) from file
+```{r}
+solar.reference <- read.csv("Wehrli85.csv", sep="", strip.white = T)
 ```
 
 ```{r}
 ggplot() +
-    geom_line(data=subset(S, band!="I"), aes(x=w,y=y,color=band)) +
-    geom_vline(xintercept=calibration.data$w) +
-    geom_text(data=calibration.data, aes(x=w+5,y=0.9,label=name), hjust=0) +
-    scale_colour_manual(name="Band", values=c("red", "green", "blue"), labels=c("R", "G", "B")) +
+    geom_line(data=solar.reference, aes(x=w,y=irradiance)) +
     theme_bw() +
-    labs(x="Wavelength [nm]", y="Spectral Response", title="Sun Spectrum / Canon EOS 10D (RGB)") +
-    coord_cartesian(xlim=c(w.min,w.max))
-```
-
-Load Sun's reference spectrum (AM0) from file
-```{r}
-sun.reference <- read.csv("Wehrli85.csv", sep="", strip.white = T)
-ggplot() +
-    geom_line(data=sun.reference, aes(x=w,y=irradiance)) +
-    theme_bw() +
-    labs(x="Wavelength [nm]", y="Irradiance [W/m^2/nm]", title="Sun Reference Spectrum (Wehrli 1985)") +
+    labs(x="Wavelength [nm]", y="Irradiance [W/m^2/nm]", title="Solar Reference Spectrum (Wehrli 1985)") +
     coord_cartesian(xlim=c(w.min,w.max))
 ```
 
 Load atmosphere transmission from file
 ```{r}
 atmosphere <- read.csv("Atmosphere Transmission.csv", sep="")
+```
+
+```{r}
 ggplot() +
     geom_line(data=atmosphere, aes(x=w,y=100*transmission)) +
     theme_bw() +
@@ -124,7 +120,7 @@ ggplot() +
 
 Calculate spectral response of Canon EOS 10D
 ```{r}
-S$irradiance <- approx(sun.reference$w, sun.reference$irradiance, S$w)$y
+S$irradiance <- approx(solar.reference$w, solar.reference$irradiance, S$w)$y
 S$transmission <- approx(atmosphere$w, atmosphere$transmission, S$w)$y
 S$response <- S$y / (S$irradiance * S$transmission)
 ```
