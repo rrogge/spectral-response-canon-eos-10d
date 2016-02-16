@@ -106,7 +106,7 @@ sun.reference <- read.csv("Wehrli85.csv", sep="", strip.white = T)
 ggplot() +
     geom_line(data=sun.reference, aes(x=w,y=irradiance)) +
     theme_bw() +
-    labs(x="Wavelength [nm]", y="Irradiance [W/m^2/nm]", title="Sun Refernce Spectrum (Wehrli 1985)") +
+    labs(x="Wavelength [nm]", y="Irradiance [W/m^2/nm]", title="Sun Reference Spectrum (Wehrli 1985)") +
     coord_cartesian(xlim=c(w.min,w.max))
 ```
 
@@ -165,3 +165,5 @@ ggplot() +
     labs(x="Wavelength [nm]", y="Spectral Response", title="Spectral Reponse Canon EOS 10D (RGB)") +
     coord_cartesian(xlim=c(w.min,w.max))
 ```
+
+The source is available as [GitHub project](http://rpubs.com/rrogge/spectral-response-canon-eos-10d).
