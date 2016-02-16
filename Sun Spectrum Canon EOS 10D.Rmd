@@ -57,8 +57,8 @@ B$y <- B$raw / f
 Combine all spectra into one data frame
 ```{r}
 S <- data.frame(x=I$x, y=I$y, raw=I$raw, band=I$band)
-for (DF in list(R,G,B)) {
-    S <- rbind(S, data.frame(x=DF$x, y=DF$y, raw=DF$raw, band=DF$band))
+for (df in list(R,G,B)) {
+    S <- rbind(S, data.frame(x=df$x, y=df$y, raw=df$raw, band=df$band))
 }
 ```
 
@@ -77,8 +77,8 @@ Use a polynomial model to calibrate wavelength
 model <- lm(w ~ poly(x,3), calibration.data)
 S$w <- predict(model, newdata=data.frame(x=S$x))
 
-w.min <- min(S$w)
-w.max <- max(S$w)
+w.min <- max(min(S$w), 350)
+w.max <- min(max(S$w), 750)
 ```
 
 ```{r}
