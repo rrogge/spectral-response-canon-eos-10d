@@ -158,7 +158,7 @@ df <- rbind(df, smooth(B$w, B$response, B$band, 0.5))
 
 ggplot() +
     geom_line(data=df, aes(x=x,y=y,color=band)) +
-    scale_colour_manual(name="Band", values=c("red", "green", "blue"), labels=c("R", "G", "B")) +
+    scale_colour_manual(guide=FALSE, values=c("red", "green", "blue"), labels=c("R", "G", "B")) +
     theme_bw() +
     labs(x="Wavelength [nm]", y="Spectral Response", title="Spectral Reponse Canon EOS 10D (RGB)") +
     coord_cartesian(xlim=c(w.min,w.max))
