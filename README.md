@@ -8,10 +8,17 @@ The easiest way to run the project is to load "Spectral Resonse Canon EOS 10D.Rm
 
 ### Input File "Atmosphere Transmission.csv"
 
-This files contain the atmosphere transmission values
+This files contains the atmosphere transmission values
 
 1. Wavelength [nm]
 1. Transmission [0.0 - 1.0]
+
+### Input file "LHires III Grating Efficiency 150.csv"
+
+This file contains the LHires III grating efficiency (150 lines/mm)
+
+1. Wavelength [nm]
+1. Grating efficiency [%]
 
 ### Input file "Wehrli1985.csv"
 

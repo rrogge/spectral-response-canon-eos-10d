@@ -84,6 +84,7 @@ w.max <- min(max(S$w), 750)
 rm(model)
 ```
 
+Plot solar spectrum taken with LHires III and Canon EOS 10D
 ```{r}
 ggplot() +
     geom_line(data=subset(S,band=="I"), aes(x=w,y=y)) +
