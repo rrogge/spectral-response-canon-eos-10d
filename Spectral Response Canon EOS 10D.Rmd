@@ -16,50 +16,40 @@ library(ggplot2)
 
 ![Solar Spectrum Canon EOS 10D](Solar Spectrum Canon EOS 10D.png)
 
-Load measured solar spectra from files
+Load solar spectra images from files
 ```{r}
-i <- readFITS("Solar Spectrum Canon EOS 10D I.fit")
-r <- readFITS("Solar Spectrum Canon EOS 10D R.fit")
-g <- readFITS("Solar Spectrum Canon EOS 10D G.fit")
-b <- readFITS("Solar Spectrum Canon EOS 10D B.fit")
+raw.i <- readFITS("Solar Spectrum Canon EOS 10D I.fit")
+raw.r <- readFITS("Solar Spectrum Canon EOS 10D R.fit")
+raw.g <- readFITS("Solar Spectrum Canon EOS 10D G.fit")
+raw.b <- readFITS("Solar Spectrum Canon EOS 10D B.fit")
 ```
 
-Calculate spectra intensity 
+Calculate spectra intensity as row means
 ```{r}
-profile <- function(fits, band, scale) {
+as.spectrum <- function(fits, band, scale) {
     means <- rowMeans(fits$imDat)
-    data.frame(x    = seq(1:fits$axDat$len[1]), # X position in the spectrum
-               y    = means / max(means),       # Normalized intensity
-               raw  = means,                    # Raw intensity
+    data.frame(x    = seq(1:fits$axDat$len[1]), # X position 
+               I    = means,                    # Raw ADU values
                band = band                      # Colour band
     ) 
 }
 
-I <- profile(i, "I")
-R <- profile(r, "R")
-G <- profile(g, "G")
-B <- profile(b, "B")
+spectrum.i <- as.spectrum(raw.i, "I")
+spectrum.r <- as.spectrum(raw.r, "R")
+spectrum.g <- as.spectrum(raw.g, "G")
+spectrum.b <- as.spectrum(raw.b, "B")
 ```
 
 Adjust green values as we have two green units per the Bayer matrix element
 ```{r}
-G$raw <- 2 * G$raw
+spectrum.g$I <- 2 * spectrum.g$I
 ```
 
-Renormalize red, green, and blue spectra
+Merge all spectra into one data frame
 ```{r}
-f <- max(R$raw, G$raw, B$raw)
-R$y <- R$raw / f
-G$y <- G$raw / f
-B$y <- B$raw / f
-rm(f)
-```
-
-Combine all spectra into one data frame
-```{r}
-S <- data.frame(x=I$x, y=I$y, raw=I$raw, band=I$band)
-for (df in list(R,G,B)) {
-    S <- rbind(S, data.frame(x=df$x, y=df$y, raw=df$raw, band=df$band))
+DF <- data.frame(x=spectrum.i$x, I=spectrum.i$I, band=spectrum.i$band)
+for (df in list(spectrum.r, spectrum.g, spectrum.b)) {
+    DF <- rbind(DF, data.frame(x=df$x, I=df$I, band=df$band))
 }
 ```
 
@@ -76,77 +66,90 @@ print(data.table(calibration.data))
 Use a polynomial model to calibrate wavelength and calculate limits for plots
 ```{r}
 model <- lm(w ~ poly(x,3), calibration.data)
-S$w <- predict(model, newdata=data.frame(x=S$x))
+DF$w <- predict(model, newdata=data.frame(x=DF$x))
 
-w.min <- max(min(S$w), 350)
-w.max <- min(max(S$w), 750)
-
-rm(model)
+w.min <- max(min(DF$w), 350)
+w.max <- min(max(DF$w), 750)
 ```
 
 Plot solar spectrum taken with LHires III and Canon EOS 10D
 ```{r}
+df <- subset(DF,band=="I")
+f <- 1/max(df$I)
 ggplot() +
-    geom_line(data=subset(S,band=="I"), aes(x=w,y=y)) +
+    geom_line(data=df, aes(x=w,y=f*I)) +
     geom_vline(data=calibration.data, aes(xintercept=w, color=c("1", "2", "3", "4"))) +
     scale_colour_manual(guide=FALSE, values=c("darkblue", "blue", "orange", "red")) +
     geom_text(data=calibration.data, aes(x=w+5,y=0.95,label=name), hjust=0) +
-    theme_bw() +
-    labs(x="Wavelength [nm]", y="Intensity", title="Solar Spectrum / Canon EOS 10D (I)") +
-    coord_cartesian(xlim=c(w.min,w.max))
+    labs(title="Solar Spectrum / Canon EOS 10D (I)",
+         x="Wavelength [nm]", 
+         y="Intensity") +
+    coord_cartesian(xlim=c(w.min,w.max)) +
+    theme_bw()
 ```
 
 Load solar reference spectrum (AM0) from file
 ```{r}
-solar.reference <- read.csv("Wehrli85.csv", sep="", strip.white = T)
+I.0 <- read.csv("Wehrli85.csv", sep="", strip.white = T)
 ```
 
 Plot solar spectrum without any atmosphere
 ```{r}
 ggplot() +
-    geom_line(data=solar.reference, aes(x=w,y=irradiance)) +
-    theme_bw() +
-    labs(x="Wavelength [nm]", y="Irradiance [W/m^2/nm]", title="Solar Reference Spectrum (Wehrli 1985)") +
-    coord_cartesian(xlim=c(w.min,w.max))
+    geom_line(data=I.0, aes(x=w,y=irradiance)) +
+    labs(title="Solar Reference Spectrum (Wehrli 1985)",
+         x="Wavelength [nm]", 
+         y="Irradiance [W/m^2/nm]") +
+    coord_cartesian(xlim=c(w.min,w.max)) +
+    theme_bw()
 ```
 
 Load atmosphere transmission from file
 ```{r}
-atmosphere <- read.csv("Atmosphere Transmission.csv", sep="")
+T.A <- read.csv("Atmosphere Transmission.csv", sep="")
 ```
 
 Plot atmosphere transmission
 ```{r}
 ggplot() +
-    geom_line(data=atmosphere, aes(x=w,y=100*transmission)) +
-    theme_bw() +
-    labs(x="Wavelength [nm]", y="Transmission [%]", title="Atmosphere Transmission (Airmass=2.13)") +
-    coord_cartesian(xlim=c(w.min,w.max))
+    geom_line(data=T.A, aes(x=w,y=100*transmission)) +
+    labs(title="Atmosphere Transmission (Airmass=2.13)",
+         x="Wavelength [nm]", 
+         y="Transmission [%]") +
+    coord_cartesian(xlim=c(w.min,w.max)) +
+    theme_bw()
 ```
 
 Load LHires III grating efficiency from file
 ```{r}
 raw <- read.csv("LHires III Grating Efficiency 150.csv")
 smoothed <- smooth.spline(raw$w, raw$efficiency, spar=0.4)
-grating <- data.frame(w=smoothed$x, efficiency=smoothed$y)
+T.SG <- data.frame(w=smoothed$x, efficiency=smoothed$y)
 rm(raw, smoothed)
 ```
 
 Plot grating efficiency of LHires III grating with 150 lines/mm
 ```{r}
-ggplot(data=grating) +
+ggplot(data=T.SG) +
     geom_line(aes(x=w, y=efficiency)) +
-    labs(title="LHires III Grating Efficiency (150 lines/mm)", x="Wavelength [nm]", y="Absolute Efficiency [%]") +
-    theme_bw() +
-    coord_cartesian(xlim=c(w.min,w.max))
+    labs(title="LHires III Grating Efficiency (150 lines/mm)", 
+         x="Wavelength [nm]", 
+         y="Absolute Efficiency [%]") +
+    coord_cartesian(xlim=c(w.min,w.max)) +
+    theme_bw()
+```
+
+The LHires III has 2 lenses, I assume the transmssion of each of these to be constant for the wavelength range I am talking about. Note: Each lense is passed twice.
+```{r}
+T.SL <- 0.95 * 0.95 * 0.95 * 0.95
 ```
 
 Calculate spectral response of Canon EOS 10D
 ```{r}
-S$irradiance <- approx(solar.reference$w, solar.reference$irradiance, S$w)$y
-S$transmission <- approx(atmosphere$w, atmosphere$transmission, S$w)$y
-S$efficiency <- approx(grating$w, grating$efficiency/100, S$w)$y
-S$response <- S$y / (S$irradiance * S$efficiency * S$transmission)
+DF$I.0 <- approx(I.0$w, I.0$irradiance, DF$w)$y
+DF$T.A <- approx(T.A$w, T.A$transmission, DF$w)$y
+DF$T.S <- approx(T.SG$w, T.SG$efficiency/100 * T.SL, DF$w)$y
+DF$S <- DF$I / (DF$I.0 * DF$T.A* DF$T.S)
 ```
 
 Plot spectral response of Canon EOS 10D 
@@ -155,39 +158,41 @@ smooth <- function(x, y, band, spar) {
     data.frame(x=x, y=smooth.spline(x, y, spar=spar)$y, band=band)
 }
 
-I <- subset(S, band=="I")
-I$response <- I$response / max(I$response)
-
-df <- smooth(I$w, I$response, I$band, 0.5)
+I <- subset(DF, band=="I")
+df <- smooth(I$w, I$S, I$band, 0.5)
+f <- 1 / max(df$y)
 
 ggplot() +
-    geom_line(data=df, aes(x=x,y=y)) +
-    theme_bw() +
-    labs(x="Wavelength [nm]", y="Spectral Response", title="Spectral Response Canon EOS 10D (I)") +
-    coord_cartesian(xlim=c(w.min,w.max))
+    geom_line(data=df, aes(x=x,y=f*y)) +
+    labs(title="Spectral Response Canon EOS 10D (I)",
+         x="Wavelength [nm]", 
+         y="Relative Spectral Response") +
+    coord_cartesian(xlim=c(w.min,w.max)) +
+    theme_bw()
 ```
 
 Plot spectral response of Canon EOS 10D for R, G, and B Bayer-matrix elements
 ```{r}
-R <- subset(S, band=="R")
-G <- subset(S, band=="G")
-B <- subset(S, band=="B")
+R <- subset(DF, band=="R")
+G <- subset(DF, band=="G")
+B <- subset(DF, band=="B")
 
-f <- max(R$response, G$response, B$response)
-R$response <- R$response / f
-G$response <- G$response / f
-B$response <- B$response / f
+df <- smooth(R$w, R$S, R$band, 0.5)
+df <- rbind(df, smooth(G$w, G$S, G$band, 0.5))
+df <- rbind(df, smooth(B$w, B$S, B$band, 0.5))
 
-df <- smooth(R$w, R$response, R$band, 0.5)
-df <- rbind(df, smooth(G$w, G$response, G$band, 0.5))
-df <- rbind(df, smooth(B$w, B$response, B$band, 0.5))
+f <- 1/max(df$y)
 
 ggplot() +
-    geom_line(data=df, aes(x=x,y=y,color=band)) +
-    scale_colour_manual(guide=FALSE, values=c("red", "green", "blue"), labels=c("R", "G", "B")) +
-    theme_bw() +
-    labs(x="Wavelength [nm]", y="Spectral Response", title="Spectral Reponse Canon EOS 10D (RGB)") +
-    coord_cartesian(xlim=c(w.min,w.max))
+    geom_line(data=df, aes(x=x,y=f*y,color=band)) +
+    scale_colour_manual(guide=FALSE, 
+                        values=c("red", "green", "blue"), 
+                        labels=c("R", "G", "B")) +
+    labs(title="Spectral Reponse Canon EOS 10D (RGB)",
+         x="Wavelength [nm]", 
+         y="Relative Spectral Response") +
+    coord_cartesian(xlim=c(w.min,w.max)) +
+    theme_bw()
 ```
 
 The source is available as [GitHub project](http://rpubs.com/rrogge/spectral-response-canon-eos-10d).
