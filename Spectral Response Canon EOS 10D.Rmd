@@ -100,6 +100,7 @@ Load solar reference spectrum (AM0) from file
 solar.reference <- read.csv("Wehrli85.csv", sep="", strip.white = T)
 ```
 
+Plot solar spectrum without any atmosphere
 ```{r}
 ggplot() +
     geom_line(data=solar.reference, aes(x=w,y=irradiance)) +
@@ -113,6 +114,7 @@ Load atmosphere transmission from file
 atmosphere <- read.csv("Atmosphere Transmission.csv", sep="")
 ```
 
+Plot atmosphere transmission
 ```{r}
 ggplot() +
     geom_line(data=atmosphere, aes(x=w,y=100*transmission)) +
@@ -129,25 +131,24 @@ grating <- data.frame(w=smoothed$x, efficiency=smoothed$y)
 rm(raw, smoothed)
 ```
 
-Plot efficiency of LHires III grating with 150 lines/mm
+Plot grating efficiency of LHires III grating with 150 lines/mm
 ```{r}
 ggplot(data=grating) +
     geom_line(aes(x=w, y=efficiency)) +
-    labs(title="LHires III Grating Efficiency (150 lines/mm)",
-         x="Wavelength [nm]",
-         y="Absolute Efficiency [%]"
-         ) +
-    theme_bw()
+    labs(title="LHires III Grating Efficiency (150 lines/mm)", x="Wavelength [nm]", y="Absolute Efficiency [%]") +
+    theme_bw() +
+    coord_cartesian(xlim=c(w.min,w.max))
 ```
 
 Calculate spectral response of Canon EOS 10D
 ```{r}
 S$irradiance <- approx(solar.reference$w, solar.reference$irradiance, S$w)$y
 S$transmission <- approx(atmosphere$w, atmosphere$transmission, S$w)$y
-S$efficiency <- approx(grating$w, grating$efficiency, S$w)$y
+S$efficiency <- approx(grating$w, grating$efficiency/100, S$w)$y
 S$response <- S$y / (S$irradiance * S$efficiency * S$transmission)
 ```
 
+Plot spectral response of Canon EOS 10D 
 ```{r}
 smooth <- function(x, y, band, spar) {
     data.frame(x=x, y=smooth.spline(x, y, spar=spar)$y, band=band)
@@ -165,6 +166,7 @@ ggplot() +
     coord_cartesian(xlim=c(w.min,w.max))
 ```
 
+Plot spectral response of Canon EOS 10D for R, G, and B Bayer-matrix elements
 ```{r}
 R <- subset(S, band=="R")
 G <- subset(S, band=="G")
