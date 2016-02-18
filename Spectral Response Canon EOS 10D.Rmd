@@ -52,6 +52,7 @@ f <- max(R$raw, G$raw, B$raw)
 R$y <- R$raw / f
 G$y <- G$raw / f
 B$y <- B$raw / f
+rm(f)
 ```
 
 Combine all spectra into one data frame
@@ -79,6 +80,8 @@ S$w <- predict(model, newdata=data.frame(x=S$x))
 
 w.min <- max(min(S$w), 350)
 w.max <- min(max(S$w), 750)
+
+rm(model)
 ```
 
 ```{r}
@@ -118,11 +121,31 @@ ggplot() +
     coord_cartesian(xlim=c(w.min,w.max))
 ```
 
+Load LHires III grating efficiency from file
+```{r}
+raw <- read.csv("LHires III Grating Efficiency 150.csv")
+smoothed <- smooth.spline(raw$w, raw$efficiency, spar=0.4)
+grating <- data.frame(w=smoothed$x, efficiency=smoothed$y)
+rm(raw, smoothed)
+```
+
+Plot efficiency of LHires III grating with 150 lines/mm
+```{r}
+ggplot(data=grating) +
+    geom_line(aes(x=w, y=efficiency)) +
+    labs(title="LHires III Grating Efficiency (150 lines/mm)",
+         x="Wavelength [nm]",
+         y="Absolute Efficiency [%]"
+         ) +
+    theme_bw()
+```
+
 Calculate spectral response of Canon EOS 10D
 ```{r}
 S$irradiance <- approx(solar.reference$w, solar.reference$irradiance, S$w)$y
 S$transmission <- approx(atmosphere$w, atmosphere$transmission, S$w)$y
-S$response <- S$y / (S$irradiance * S$transmission)
+S$efficiency <- approx(grating$w, grating$efficiency, S$w)$y
+S$response <- S$y / (S$irradiance * S$efficiency * S$transmission)
 ```
 
 ```{r}
